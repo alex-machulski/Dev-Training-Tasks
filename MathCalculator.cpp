@@ -1,180 +1,249 @@
 #include <iostream>
-#include <stdlib.h>
-#define N 10
-#define CELL '*'
-#define EMPTY ' '
+#include <cstring>
+#include <cstdlib>
+#define AMOUNT_NUMBERS 100
 
 using namespace std;
-char getRandomCell();
-void fillTheFields(char arr[][N], int matrixSide);
-void printLifeBoard(char arr[][N], int matrixSide);
-void copyArray(char fromArray[][N], char toArray[][N], int matrixSide);
-int checkLivingCellsAround(char arr[N][N], int matrixSide, int i, int j);
-int correctXY(int coordinate, int matrixSide);
-void getGenerationChange(char arr[][N], char tempArr[][N], int matrixSide);
-bool isCellsOnMatrix(char arr[][N], int matrixSide);
-bool isGenerationChanged(char arr[][N], char tempArr[][N], int matrixSide);
-
-char life[N][N], tempLife[N][N];
-int livingCells = 0, numberOfGenerations = 0, generationCounter = 0;
+void clearString(char str[]);
+bool isTwoOperationsInRow(char str[]);
+bool isSpace(char str[]);
+bool isWrongSymbols(char str[]);
+bool isOnlyNumbers(char str[]);
+bool isDividingByZero(char str[]);
+bool isBracket(char str[]);
+double multiplyAndDivision(char operations[], int numbers[AMOUNT_NUMBERS], double result);
+double additionAndSubtraction(char operations[], int numbers[AMOUNT_NUMBERS], double result);
 
 int main()
 {
-    cout << "This is Conway's Game of Life" << endl;
+    char str[250]; // example "1+25/4-3/11";
+    char operations[100], strTemp[10];
+    int numbers[AMOUNT_NUMBERS] = { 0 }, lastOperation = 0;
+    double result = 0.0, subResult = 0.0;
+    // input validation
     while (true) {
-        cout << "Enter the number of generations (number > 0): ";
-        cin >> numberOfGenerations;
-        if (numberOfGenerations < 1) {
-            cout << "Wrong number, try again." << endl << endl;
+        cout << "Enter math expression (without spaces): ";
+        cin >> str;
+        if (str[0] == '*' || str[0] == '/') {
+            cout << "Math expression cannot start with '*' or '/'. Try again." << endl;
+            continue;
+        }
+        else if (str[strlen(str) - 1] == '*' || str[strlen(str) - 1] == '/' || str[strlen(str) - 1] == '+' || str[strlen(str) - 1] == '-') {
+            cout << "Math expression cannot end with '*', '/', '+' or '-'. Try again." << endl;
+            continue;
+        }
+        else if (isTwoOperationsInRow(str)) {
+            cout << "In mathematical expression cannot be 2 or more operations in a row. Try again." << endl;
+            continue;
+        }
+        else if (isSpace(str)) {
+            cout << "Mathematical expression must be without spaces. Try again." << endl;
+            continue;
+        }
+        else if (isBracket(str)) {
+            cout << "Sorry, but this calculator does not support brackets. Try again" << endl;
+            continue;
+        }
+        else if (isWrongSymbols(str)) {
+            cout << "Mathematical expression contains wrong characters. Try again." << endl;
+            continue;
+        }
+        else if (isDividingByZero(str)) {
+            cout << "Division by zero is prohibited. Try again." << endl;
+            continue;
         }
         else
             break;
     }
-    cout << "The game started!" << endl;
-    fillTheFields(life, N);
-    while (numberOfGenerations >= 0) {
-        system("clear");
-        cout << generationCounter << " generation: " << endl;
-        printLifeBoard(life, N);
-        getchar();
-        copyArray(life, tempLife, N);
-        getGenerationChange(life, tempLife, N);
-        if (!(isCellsOnMatrix(life, N)))
-            break;
-        if (!(isGenerationChanged(life, tempLife, N)))
-            break;
-        generationCounter++;
-        numberOfGenerations--;
+    //parsing numbers and operations
+    for (int i = 0, j = 0, k = 0, m = 0; i < strlen(str); i++) {
+        if (i == 0 && (str[i] == '+' || str[0] == '-'))
+            continue;
+        if ((str[i] >= '0' && str[i] <= '9') || (j == 0 && str[i] == '-')) {
+            strTemp[j] = str[i];
+            j++;
+        }
+        if ((str[i] == '+') || (str[i] == '-' && j != 0) || (str[i] == '*') || (str[i] == '/') || (i == strlen(str) - 1)) {
+            strTemp[j] = '\0';
+            numbers[k] = atoi(strTemp);
+            clearString(strTemp);
+            k++;
+            j = 0;
+            if (i != strlen(str) - 1) {
+                operations[m] = str[i];
+                m++;
+                lastOperation = m;
+            }
+            if (str[i] == '-') {
+                strTemp[j] = str[i];
+                j++;
+            }
+        }
     }
+    if (str[0] == '-')
+        numbers[0] = -numbers[0];
+    operations[lastOperation] = '\0';
+    // multiplication and division (first priority)
+    subResult = multiplyAndDivision(operations, numbers, subResult);
+    // addition and subtraction (second priority)
+    result = additionAndSubtraction(operations, numbers, subResult);
+    if (isOnlyNumbers(str) && strlen(operations) == 0)
+        result = numbers[0];
+
+    cout << "The result: " << result;
 
     return 0;
 }
 
-char getRandomCell() {
-    char cell;
-
-    int x = rand() % 2;
-    if (x == 0)
-        cell = EMPTY;
-    else
-        cell = CELL;
-
-    return cell;
+void clearString(char str[]) {
+    for (int i = 0; i < strlen(str); i++)
+        str[i] = ' ';
 }
 
-void fillTheFields(char arr[][N], int matrixSide) {
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < N; j++)
-            arr[i][j] = EMPTY;
-    }
-    arr[4][4] = CELL;
-    arr[5][5] = CELL;
-    arr[6][3] = CELL;
-    arr[6][4] = CELL;
-    arr[6][5] = CELL;
-}
+bool isTwoOperationsInRow(char str[]) {
+    bool twoOperations = false;
 
-void printLifeBoard(char arr[][N], int matrixSide) {
-    for (int i = 0; i < matrixSide; i++) {
-        for (int j = 0; j < matrixSide; j++) {
-            cout << arr[i][j] << " ";
-        }
-        cout << endl;
-    }
-}
-
-void copyArray(char fromArray[][N], char toArray[][N], int matrixSide) {
-    for (int i = 0; i < matrixSide; i++) {
-        for (int j = 0; j < matrixSide; j++) {
-            toArray[i][j] = fromArray[i][j];
-        }
-    }
-}
-
-int checkLivingCellsAround(char arr[N][N], int matrixSide, int i, int j) {
-    int result = 0;
-
-    if (arr[correctXY(i, matrixSide)][correctXY(j - 1, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i, matrixSide)][correctXY(j + 1, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i + 1, matrixSide)][correctXY(j, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i - 1, matrixSide)][correctXY(j, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i + 1, matrixSide)][correctXY(j - 1, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i - 1, matrixSide)][correctXY(j - 1, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i - 1, matrixSide)][correctXY(j + 1, matrixSide)] == CELL)
-        result++;
-    if (arr[correctXY(i + 1, matrixSide)][correctXY(j + 1, matrixSide)] == CELL)
-        result++;
-
-    return result;
-}
-
-int correctXY(int coordinate, int matrixSide) {
-    int correctCoordinate;
-
-    if (coordinate < 0)
-        correctCoordinate = matrixSide - 1;
-    else if (coordinate > matrixSide - 1)
-        correctCoordinate = 0;
-    else
-        correctCoordinate = coordinate;
-
-    return correctCoordinate;
-}
-
-void getGenerationChange(char arr[][N], char tempArr[][N], int matrixSide) {
-    for (int i = 0; i < matrixSide; i++) {
-        for (int j = 0; j < matrixSide; j++) {
-            livingCells = checkLivingCellsAround(tempArr, matrixSide, i, j);
-            if (tempArr[i][j] == EMPTY && livingCells == 3)
-                arr[i][j] = CELL;
-            else if (livingCells == 0 && tempArr[i][j] == CELL)
-                arr[i][j] = EMPTY;
-            else if (livingCells == 1 && tempArr[i][j] == CELL)
-                arr[i][j] = EMPTY;
-            else if (livingCells >= 4 && tempArr[i][j] == CELL)
-                arr[i][j] = EMPTY;
-            else if (livingCells >= 2 && livingCells <= 3 && tempArr[i][j] == CELL)
-                continue;
-        }
-    }
-}
-
-bool isCellsOnMatrix(char arr[][N], int matrixSide) {
-    bool result = false;
-
-    for (int i = 0; i < matrixSide; i++) {
-        for (int j = 0; j < matrixSide; j++) {
-            if (arr[i][j] == CELL) {
-                result = true;
+    for (int i = 0; i < strlen(str) - 1; i++) {
+        if (str[i] == '*' || str[i] == '/' || str[i] == '+' || str[i] == '-') {
+            if (str[i + 1] == '*' || str[i + 1] == '/' || str[i + 1] == '+' || str[i + 1] == '-') {
+                twoOperations = true;
                 break;
             }
         }
-        if (result)
-            break;
     }
 
-    return result;
+    return twoOperations;
 }
 
-bool isGenerationChanged(char arr[][N], char tempArr[][N], int matrixSide) {
-    bool result = false;
+bool isSpace(char str[]) {
+    bool space = false;
 
-    for (int i = 0; i < matrixSide; i++) {
-        for (int j = 0; j < matrixSide; j++) {
-            if (arr[i][j] != tempArr[i][j]) {
-                result = true;
-                break;
+    for (int i = 0; i < strlen(str); i++) {
+        if (str[i] == ' ') {
+            space = true;
+            break;
+        }
+    }
+
+    return space;
+}
+
+bool isWrongSymbols(char str[]) {
+    bool wrongSymbol = false;
+
+    for (int i = 0; i < strlen(str); i++) {
+        if (str[i] < 42 || (str[i] > 43 && str[i] < 45) || (str[i] > 45 && str[i] < 47) || str[i] > 57)
+            wrongSymbol = true;
+        break;
+    }
+
+    return wrongSymbol;
+}
+
+bool isOnlyNumbers(char str[]) {
+    bool onlyNumbers = true;
+
+    for (int i = 0; i < strlen(str); i++) {
+        if (str[i] < 43 || (str[i] > 43 && str[i] < 45) || (str[i] > 45 && str[i] < 48) || str[i] > 57) {
+            return false;
+        }
+    }
+
+    return onlyNumbers;
+}
+
+bool isDividingByZero(char str[]) {
+    for (int i = 0; i < strlen(str) - 1; i++) {
+        if (str[i] == '/') {
+            if (str[i + 1] == '0') {
+                return true;
             }
         }
-        if (result)
+    }
+
+    return false;
+}
+
+bool isBracket(char str[]) {
+    bool bracket = false;
+
+    for (int i = 0; i < strlen(str); i++) {
+        if (str[i] == '(' || str[i] == ')') {
+            bracket = true;
             break;
+        }
+    }
+
+    return bracket;
+}
+
+double multiplyAndDivision(char operations[], int numbers[AMOUNT_NUMBERS], double result) {
+    double tempResult = 1.0;
+
+    for (int i = 0; i < strlen(operations); i++) {
+        if (i > 0) {
+            // previous and next operations are NOT '*' or '/'
+            if (operations[i] == '*' && (operations[i - 1] != '*' && operations[i - 1] != '/') && (operations[i + 1] != '*' && operations[i + 1] != '/')) {
+                result = result + numbers[i] * numbers[i + 1];
+            }
+            else if (operations[i] == '/' && (operations[i - 1] != '*' && operations[i - 1] != '/') && (operations[i + 1] != '*' && operations[i + 1] != '/')) {
+                result = result + 1.0 * numbers[i] / numbers[i + 1];
+            }
+            // previous operation is '*' or '/', next operation is NOT '*' or '/'
+            else if (operations[i] == '*' && (operations[i - 1] == '*' || operations[i - 1] == '/') && (operations[i + 1] != '*' && operations[i + 1] != '/')) {
+                result = result + tempResult * numbers[i + 1];
+                tempResult = 1.0;
+            }
+            else if (operations[i] == '/' && (operations[i - 1] == '*' || operations[i - 1] == '/') && (operations[i + 1] != '*' && operations[i + 1] != '/')) {
+                result = result + 1.0 * tempResult / numbers[i + 1];
+                tempResult = 1.0;
+            }
+            // previous and next operations are '*' or '/'
+            else if (operations[i] == '*' && (operations[i - 1] == '*' || operations[i - 1] == '/') && (operations[i + 1] == '*' || operations[i + 1] == '/')) {
+                tempResult = tempResult * numbers[i + 1];
+            }
+            else if (operations[i] == '/' && (operations[i - 1] == '*' || operations[i - 1] == '/') && (operations[i + 1] == '*' || operations[i + 1] == '/')) {
+                tempResult = 1.0 * tempResult / numbers[i + 1];
+            }
+            // previous operation is NOT '*' or '/', next operation is '*' or '/'
+            else if (operations[i] == '*' && (operations[i - 1] != '*' && operations[i - 1] != '/') && (operations[i + 1] == '*' || operations[i + 1] == '/')) {
+                tempResult = numbers[i] * numbers[i + 1];
+            }
+            else if (operations[i] == '/' && (operations[i - 1] != '*' && operations[i - 1] != '/') && (operations[i + 1] == '*' || operations[i + 1] == '/')) {
+                tempResult = 1.0 * numbers[i] / numbers[i + 1];
+            }
+        }
+        else {
+            if (operations[i] == '*')
+                result = result + numbers[i] * numbers[i + 1];
+            else if (operations[i] == '/')
+                result = result + 1.0 * numbers[i] / numbers[i + 1];
+        }
     }
 
     return result;
 }
+
+double additionAndSubtraction(char operations[], int numbers[AMOUNT_NUMBERS], double result) {
+    for (int i = 0; i < strlen(operations); i++) {
+        if ((operations[i] == '+' || operations[i] == '-') && i == 0) {
+            result = result + numbers[i];
+        }
+        if (operations[i] == '+' && operations[i + 1] != '*' && operations[i + 1] != '/') {
+            result = result + numbers[i + 1];
+        }
+        else if (operations[i] == '-' && operations[i + 1] != '*' && operations[i + 1] != '/') {
+            result = result + numbers[i + 1];
+        }
+    }
+
+    return result;
+}
+
+
+
+
+
+
+
+
